@@ -65,9 +65,65 @@ your_mcp/
 
 ---
 
-## 🔧 Critical Rules
+## 🔧 Critical Rules (HARD REQUIREMENTS)
 
-### 1. Import Strategy ⚠️
+### 1. Environment Variable Handling ⚠️ **MOST CRITICAL - ALWAYS FOLLOW THIS**
+
+**THE PROBLEM THAT CAUSED FAILURES:**
+Environment variables are always strings. YAML `${}` expansion only works at load time and doesn't handle type conversion. If you don't check `os.getenv()` in Python code, environment variables will be IGNORED!
+
+**THE CORRECT PATTERN (3-Layer Approach):**
+
+#### Layer 1: YAML Config (settings.yaml) - Simple Defaults with Comments
+```yaml
+security:
+  authentication:
+    enabled: false  # Set AUTH_ENABLED=true in .env to enable
+    bearer_token: ""  # Set AUTH_TOKEN in .env
+server:
+  port: 8000  # Set MCP_PORT in .env
+```
+
+**DO NOT use `${VAR}` syntax** - it only works at file load and can't convert types properly.
+
+#### Layer 2: Python Code - Always Check os.getenv() FIRST
+```python
+import os
+
+# Boolean from env var (string "true"/"false" -> bool)
+auth_enabled = os.getenv('AUTH_ENABLED', '').lower() == 'true' if os.getenv('AUTH_ENABLED') else config.get('security', {}).get('authentication', {}).get('enabled', False)
+
+# String from env var (with fallback)
+token = os.getenv('AUTH_TOKEN', '') or config.get('security', {}).get('authentication', {}).get('bearer_token', '')
+
+# Integer from env var
+port = int(os.getenv('MCP_PORT', config.get('server', {}).get('port', 8000)))
+```
+
+#### Layer 3: Docker Compose - Pass Environment Variables
+```yaml
+environment:
+  - AUTH_ENABLED=${AUTH_ENABLED:-false}
+  - AUTH_TOKEN=${AUTH_TOKEN:-}
+  - MCP_PORT=${MCP_PORT:-8000}
+```
+
+**WHY THIS PATTERN WORKS:**
+- ✅ Environment variables override config at **runtime** (not load time)
+- ✅ Type conversion happens in Python where it's **explicit**
+- ✅ Config file provides **documented defaults**
+- ✅ Works in Docker, local dev, and production consistently
+- ✅ No surprises - if env var is set, it WILL be used
+
+**COMMON MISTAKES TO AVOID:**
+- ❌ Using `${}` in YAML for booleans/integers (only works for strings at load time)
+- ❌ Reading config dict without checking `os.getenv()` first
+- ❌ Assuming YAML expansion will handle type conversion
+- ❌ Not documenting env vars in comments
+
+---
+
+### 2. Import Strategy ⚠️
 
 **RULE**: Use **absolute imports only** (no relative imports)
 
@@ -83,7 +139,9 @@ from utils import helper
 
 **Why**: FastMCP runs with `uvicorn server:app`, treating files as scripts, not packages.
 
-### 2. Config Module vs Package ⚠️
+---
+
+### 3. Config Module vs Package ⚠️
 
 **RULE**: `config.py` is a **MODULE** (file), not a package (folder)
 
@@ -100,7 +158,9 @@ server/
     └── settings.yaml
 ```
 
-### 3. FastMCP 2.x API ⚠️
+---
+
+### 4. FastMCP 2.x API ⚠️
 
 **RULE**: Use FastMCP 2.x API (not 0.x)
 
@@ -109,6 +169,7 @@ server/
 from fastmcp import FastMCP
 
 mcp = FastMCP(name="your-mcp")  # Only 'name' parameter
+mcp_http_app = mcp.http_app()   # Get ASGI app for mounting
 
 @mcp.tool()
 async def my_tool(...): ...
@@ -118,6 +179,9 @@ async def my_resource(): ...
 
 @mcp.prompt()
 def my_prompt(): ...
+
+# Mount in Starlette server.py:
+app.mount('/', mcp_http_app)
 ```
 
 ```python
@@ -128,9 +192,14 @@ mcp = FastMCP(
     description="..."   # Not supported in 2.x
 )
 
+# ❌ WRONG - Accessing internal _mcp_server
+app.mount('/', mcp._mcp_server)  # NEVER DO THIS!
+
 @mcp.resource("name")   # Missing scheme:// in 2.x
 @mcp.prompt("name")     # Use function name in 2.x
 ```
+
+**CRITICAL**: Always use `mcp.http_app()` method, **NEVER** access `_mcp_server` directly!
 
 ---
 
