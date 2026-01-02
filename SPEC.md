@@ -423,9 +423,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install uv (fast Python package installer)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Install dependencies
 COPY server/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy server code
 COPY server/ .
@@ -436,6 +439,8 @@ EXPOSE 8000
 # Run server
 CMD ["python", "server.py"]
 ```
+
+**IMPORTANT**: Use `uv` instead of `pip` for faster, more reliable dependency installation.
 
 ### docker-compose.yml Structure
 
