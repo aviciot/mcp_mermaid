@@ -1,16 +1,16 @@
-# Template MCP Configuration
+# Mermaid MCP Configuration
 # ==========================
 
 # Server Configuration
 server:
   version: "1.0.0"
   host: "0.0.0.0"
-  port: 8000  # Override with MCP_PORT env var in .env
+  port: 8400  # Override with MCP_PORT env var in .env
 
 # MCP Configuration
 mcp:
-  name: "template-mcp"
-  description: "Base template for MCP servers"
+  name: "mermaid-mcp"
+  description: "Generate Mermaid diagrams (flowcharts, sequence diagrams, etc.) as PNG/SVG/PDF images"
 
 # Security Configuration
 security:
@@ -18,5 +18,22 @@ security:
     enabled: false  # Set AUTH_ENABLED=true in .env to enable
     bearer_token: ""  # Set AUTH_TOKEN in .env
 
-# Add your custom configuration below
+# Mermaid Configuration
 # ==================================
+mermaid:
+  # Output settings
+  output_dir: "/app/data/diagrams"  # Where generated diagrams are saved
+  default_format: "svg"  # Default output format: png, svg, pdf
+  default_theme: "default"  # default, dark, forest, neutral
+  default_background: "white"  # white, transparent
+  
+  # Retry settings
+  max_retry_attempts: 5  # Max times to retry on syntax errors
+  
+  # File retention
+  cleanup_after_hours: 24  # Delete diagrams older than 24 hours (0 = never)
+  
+  # Diagram limits (prevent abuse)
+  max_diagram_size: 50000  # Max characters in diagram code
+  max_nodes: 500  # Max nodes in a single diagram
+

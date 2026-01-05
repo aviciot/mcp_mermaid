@@ -1,281 +1,327 @@
-# Template MCP Server
+# Mermaid MCP Server
 
-A production-ready base template for building MCP (Model Context Protocol) servers using FastMCP 2.x.
+Generate beautiful diagrams from Mermaid syntax code via Model Context Protocol (MCP).
 
 ## Features
 
-- ✅ **FastMCP 2.x** - Latest FastMCP framework with proper API usage
-- ✅ **Auto-Discovery** - Automatically discovers and loads all tools, resources, and prompts
-- ✅ **Request Logging** - Logs every request with correlation IDs for debugging
-- ✅ **Error Handling** - Comprehensive error handling patterns in all tools
-- ✅ **Config Validation** - Validates configuration on startup (fail fast)
-- ✅ **Multiple Auth Methods** - Bearer token, API Key, Basic Auth support
-- ✅ **Health Checks** - Simple (`/healthz`) and deep (`/health/deep`) health checks
-- ✅ **Environment Configs** - Separate configs for dev/prod environments
-- ✅ **Testing Framework** - Pytest examples for testing tools
-- ✅ **Database Template** - Connection pooling pattern for databases
-- ✅ **Structured Logging** - Optional JSON logging for production
-- ✅ **Docker Ready** - Complete Docker setup with health checks
-- ✅ **Graceful Shutdown** - Handles SIGINT/SIGTERM properly
-- ✅ **Rate Limiting** - Optional rate limiting middleware
-- ✅ **LLM-Ready** - Comprehensive SPEC.md for AI-assisted development
+- **3 MCP Tools**: Generate diagrams, validate syntax, list diagram types
+- **Multiple Formats**: PNG, SVG (default), PDF
+- **Configurable Quality**: Scale (1-3) and width (800-3200px) settings
+- **8+ Diagram Types**: Flowcharts, sequence, class, ER, state, gantt, pie, gitGraph
+- **HTTP Image Serving**: Returns URLs to view diagrams in browser/chat
+- **Authentication**: Optional Bearer token auth for security
+- **Docker Deployment**: Fully containerized with mermaid-cli
 
 ## Quick Start
 
-### 1. Clone and Setup
+### 1. Clone & Configure
 
 ```bash
-git clone https://github.com/aviciot/template_mcp.git
-cd template_mcp
+git clone https://github.com/aviciot/mcp_mermaid
+cd mcp_mermaid
+
+# Copy environment template
 cp .env.example .env
+
+# Edit .env (optional - auth disabled by default)
+# AUTH_ENABLED=true
+# AUTH_TOKEN=your_secret_token
+# PUBLIC_BASE_URL=http://localhost:8401
 ```
 
-### 2. Configure
-
-Edit `server/config/settings.yaml`:
-
-```yaml
-mcp:
-  name: "your-mcp-name"
-  description: "Your MCP description"
-```
-
-### 3. Run with Docker
+### 2. Start Server
 
 ```bash
 docker-compose up -d
 ```
 
-### 4. Test
+Server runs on `http://localhost:8401`
 
-```bash
-# Health check
-curl http://localhost:8100/healthz
+### 3. Configure Claude Desktop
 
-# Deep health check
-curl http://localhost:8100/health/deep
+Add to `claude_desktop_config.json`:
 
-# Version info
-curl http://localhost:8100/version
-
-# MCP endpoint (requires MCP client with SSE support)
-# The MCP protocol endpoint is at http://localhost:8100/mcp
-# Use an MCP client SDK to properly connect:
-# - Claude Desktop
-# - MCP Python SDK
-# - MCP TypeScript SDK
+```json
+{
+  "mcpServers": {
+    "mermaid": {
+      "url": "http://localhost:8401/sse",
+      "transport": {
+        "type": "sse"
+      }
+    }
+  }
+}
 ```
 
-### 5. Run Tests
+Restart Claude Desktop.
 
-```bash
-cd template_mcp
-pip install -r tests/requirements.txt
-pytest tests/ -v
-```
+## Usage
 
-**Note**: The MCP protocol uses Server-Sent Events (SSE) and requires proper session management. Direct curl requests won't work - use an MCP client SDK or configure Claude Desktop to connect.
-
-## Project Structure
+### Generate Diagram
 
 ```
-template_mcp/
-├── server/
-│   ├── config.py              # Configuration loader
-│   ├── server.py              # Starlette app with middleware
-│   ├── mcp_app.py            # FastMCP instance
-│   ├── config/
-│   │   ├── settings.yaml     # Default configuration
-│   │   ├── settings.dev.yaml # Development config
-│   │   └── settings.prod.yaml # Production config
-│   ├── tools/
-│   │   └── example_tool.py   # Example tool with error handling
-│   ├── resources/
-│   │   └── example_resource.py  # Example resource
-│   ├── prompts/
-│   │   └── example_prompt.py    # Example prompt
-│   ├── db/
-│   │   └── connector.py      # Database connector template
-│   └── utils/
-│       ├── import_utils.py   # Auto-discovery
-│       ├── config_validator.py  # Config validation
-│       ├── request_logging.py   # Request logging
-│       └── rate_limiting.py     # Rate limiting (optional)
-├── tests/
-│   ├── conftest.py           # Pytest configuration
-│   ├── test_example_tool.py # Example tests
-│   └── requirements.txt      # Test dependencies
-├── docker-compose.yml
-├── Dockerfile
-├── SPEC.md                   # Technical spec for LLMs
-└── .env.example
+User: Create a flowchart showing user authentication flow
+
+Claude: [Calls generate_mermaid_diagram with mermaid_code]
 ```
 
-## Adding Your Own Tools
+**Tool Parameters:**
+- `mermaid_code` (required): Mermaid diagram syntax
+- `output_format`: svg (default), png, pdf
+- `theme`: default, dark, forest, neutral
+- `background`: white, transparent
+- `scale`: 1 (fast), 2 (balanced), 3 (high quality)
+- `width`: 800-3200 pixels
 
-1. Create a new file in `server/tools/`:
-
-```python
-# server/tools/my_tool.py
-from mcp_app import mcp
-
-@mcp.tool()
-async def my_tool(param: str) -> str:
-    """Tool description"""
-    return f"Result: {param}"
+**Response:**
+```json
+{
+  "success": true,
+  "image_url": "http://localhost:8401/diagrams/diagram_abc123_1234567890.svg?token=your_token",
+  "file_name": "diagram_abc123_1234567890.svg",
+  "format": "svg",
+  "size_bytes": 15420
+}
 ```
 
-2. Restart the server - tool is automatically discovered!
+### Validate Syntax
 
-## Adding Resources
+```
+User: Check if this Mermaid code is valid: graph TD; A-->B
 
-```python
-# server/resources/my_resource.py
-from mcp_app import mcp
-
-@mcp.resource("info://my-resource")
-async def my_resource() -> str:
-    """Resource description"""
-    return "Resource content"
+Claude: [Calls validate_mermaid_syntax]
 ```
 
-## Adding Prompts
+Returns: `{valid: true, diagram_type: "flowchart", node_count: 1}`
 
-```python
-# server/prompts/my_prompt.py
-from mcp_app import mcp
-ENV` - Environment (dev, prod, or default)
-- `MCP_PORT` - Server port (default: 8100)
-- `AUTO_DISCOVER` - Auto-load tools/resources/prompts (default: true)
-- `AUTH_ENABLED` - Enable authentication (default: false)
-- `AUTH_TOKEN` - Bearer token for authentication
-- `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
-- `LOG_FORMAT` - Log format (text or json)
+### List Diagram Types
 
-### Environment-Specific Configs
+```
+User: What diagram types are supported?
 
-Load different configurations based on environment:
-
-```bash
-# Development
-ENV=dev docker-compose up  # Uses settings.dev.yaml
-
-# Production
-ENV=prod docker-compose up  # Uses settings.prod.yaml
-
-# Default
-docker-compose up  # Uses settings.yaml
+Claude: [Calls list_diagram_types]
 ```
 
-### Settings File
+Returns supported types with examples.
 
-Edit `server/config/settings.yaml` for:
-- Server name and version
-- Custom configuration
-- Business logic
+## Diagram Examples
 
-Use `${ENV_VAR}` syntax to reference environment variables:
+### Flowchart
+```mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+    C --> E[End]
+    D --> E
+```
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    Alice->>Bob: Hello Bob!
+    Bob-->>Alice: Hi Alice!
+    Alice->>Bob: How are you?
+```
+
+### ER Diagram
+```mermaid
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE-ITEM : contains
+    CUSTOMER {
+        string name
+        string email
+    }
+```
+
+See full examples: [Mermaid Documentation](https://mermaid.js.org/)
+
+## Configuration
+
+Edit `server/config/settings.yaml`:
 
 ```yaml
-server:
-  port: ${MCP_PORT:-8100}  # Default 81
-
-Edit `server/config/settings.yaml` for:
-- Server name and version
-- Custom configuration
-- Business logic
-
-Use `${ENV_VAR}` syntax to reference environment variables:
-
-```yaml
-server:
-  port: ${MCP_PORT:-8000}  # Default 8000 if not set
+mermaid:
+  default_format: "svg"        # Default output format
+  default_theme: "default"     # Default theme
+  default_background: "white"  # Background color
+  max_retry_attempts: 5        # Max syntax error retries
+  cleanup_after_hours: 24      # Auto-delete old diagrams (0=never)
+  max_diagram_size: 50000      # Max characters in code
 ```
+
+## Quality Settings
+
+| Profile | Scale | Width | Time | Size | Use Case |
+|---------|-------|-------|------|------|----------|
+| **Fast** | 1 | 800px | ~5-10s | ~10KB | Quick previews |
+| **Balanced** | 2 | 1600px | ~10-15s | ~30KB | General use (default) |
+| **High** | 3 | 2400px | ~20-30s | ~90KB | Presentations |
+
+**Note**: SVG ignores scale/width (vector format). Fastest option.
+
+## Format Comparison
+
+| Format | Size | Quality | Browser | Slack | MCPJam |
+|--------|------|---------|---------|-------|--------|
+| **SVG** | Smallest | Scalable | ✅ | ⚠️ Converts to PNG | ✅ Best |
+| **PNG** | Medium | Fixed | ✅ | ✅ Best | ✅ |
+| **PDF** | Largest | Fixed | ✅ | ❌ | ❌ |
+
+**Recommendation**: Use SVG for web/MCPJam, PNG for Slack.
 
 ## Authentication
 
-Enable authentication in `.env`:
+### Enable Authentication
 
+In `.env`:
 ```bash
 AUTH_ENABLED=true
-AUTH_TOKEN=your-secret-token
+AUTH_TOKEN=your_secret_token_here
 ```
-Run Tests
+
+### MCP Tool Calls
+
+Claude automatically includes Bearer token (configured in `claude_desktop_config.json`).
+
+### Direct API Calls
 
 ```bash
-pip install -r tests/requirements.txt
-pytest tests/ -v
+curl -X POST http://localhost:8401/mcp \
+  -H "Authorization: Bearer your_token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "generate_mermaid_diagram",
+      "arguments": {
+        "mermaid_code": "graph TD; A-->B"
+      }
+    },
+    "id": 1
+  }'
 ```
 
-### View Logs
+### View Images
 
+Images include token in URL: `?token=your_token`
+
+```
+http://localhost:8401/diagrams/diagram_abc123.svg?token=your_token
+```
+
+## Architecture
+
+```
+mermaid-mcp/
+├── docker-compose.yml          # Container orchestration
+├── Dockerfile                  # Python + Node.js + mermaid-cli
+├── .env                        # Configuration
+├── server/
+│   ├── server.py              # Starlette + MCP server
+│   ├── mcp_app.py             # FastMCP instance
+│   ├── config.py              # Config loader
+│   ├── config/
+│   │   └── settings.yaml      # Main configuration
+│   └── tools/
+│       └── mermaid_tools.py   # 3 MCP tools
+└── data/
+    └── diagrams/              # Generated images (Docker volume)
+```
+
+## Ports
+
+- **8401** (host) → **8400** (container)
+- Change in `docker-compose.yml` if needed
+
+## Troubleshooting
+
+### Check Logs
 ```bash
-docker-compose logs -f template_mcp
+docker logs mermaid_mcp
 ```
 
-### Enable Rate Limiting (Optional)
+### Common Issues
 
-1. Uncomment `slowapi` in `server/requirements.txt`
-2. Uncomment rate limiting code in `server.py`
-3. Rebuild container: `docker-compose build`
+**"Connection refused"**
+- Check container is running: `docker ps | grep mermaid_mcp`
+- Verify port 8401 is not in use
 
-### Database Integration (Optional)
+**"Authentication failed"**
+- Check `.env` AUTH_TOKEN matches Claude Desktop config
+- Ensure AUTH_ENABLED=true if using authentication
 
-1. Uncomment your database driver in `server/requirements.txt`
-2. Adapt `server/db/connector.py` for your database
-3. Initialize connection in `server.py` startup
-4. Use in tools: `from db.connector import db`
+**"Syntax error in diagram"**
+- Use `validate_mermaid_syntax` tool first
+- Check [Mermaid Live Editor](https://mermaid.live) for syntax
 
-## For LLMs: Creating New MCPs
+**"Generation timeout"**
+- Reduce quality: scale=1, width=800
+- Use SVG format (fastest)
+- Simplify complex diagrams
 
-Read [SPEC.md](SPEC.md) for comprehensive technical specification including:
-- Exact patterns to follow
-- File templates
-- Critical rules (imports, FastMCP API, etc.)
-- Testing patterns
-- Common mistakes to avoid
-
-**Quick Start**: Clone this repo, read SPEC.md, follow the checklist.
-
-## Request Logging
-
-All requests are logged with correlation IDs:
-
-```
-[abc12345] → POST /mcp
-[abc12345] ← 200 POST /mcp (45ms)
+### Restart Server
+```bash
+docker-compose restart
 ```
 
-Correlation IDs are also returned in response headers: `X-Correlation-ID`
-
-## Health Checks
-
-- `/healthz` - Simple health check (fast)
-- `/health/deep` - Checks all dependencies (database, external APIs)
-- `/version` - Server version infol -H "Authorization: Bearer your-secret-token" \
-  http://localhost:8000/
+### Rebuild After Changes
+```bash
+docker-compose down
+docker-compose build
+docker-compose up -d
 ```
 
 ## Development
 
-### Run Without Docker
+### Local Testing (without Docker)
 
 ```bash
 cd server
 pip install -r requirements.txt
+
+# Install Node.js and mermaid-cli
+npm install -g @mermaid-js/mermaid-cli
+
+# Run server
 python server.py
 ```
 
-### View Logs
+### Add Custom Tool
 
-```bash
-docker-compose logs -f template_mcp
-```
+1. Create `server/tools/my_tool.py`
+2. Import mcp instance: `from mcp_app import mcp`
+3. Define tool with `@mcp.tool()` decorator
+4. Restart container
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_PORT` | 8400 | Server port (inside container) |
+| `AUTH_ENABLED` | false | Enable Bearer token authentication |
+| `AUTH_TOKEN` | - | Secret token for auth |
+| `PUBLIC_BASE_URL` | http://localhost:8401 | Public URL for image links |
+| `MERMAID_OUTPUT_DIR` | /app/data/diagrams | Diagram storage path |
+| `MERMAID_MAX_RETRIES` | 5 | Max syntax error retries |
 
 ## License
 
-MIT License - Free to use and modify
+MIT
+
+## Links
+
+- **Mermaid Documentation**: https://mermaid.js.org/
+- **MCP Specification**: https://modelcontextprotocol.io/
+- **FastMCP Framework**: https://github.com/jlowin/fastmcp
 
 ## Support
 
-For issues or questions, please open an issue on GitHub.
+Issues: https://github.com/aviciot/mcp_mermaid/issues
+
+---
+
+Built with ❤️ using FastMCP and Mermaid

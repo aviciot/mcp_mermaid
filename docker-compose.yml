@@ -1,21 +1,28 @@
 version: '3.8'
 
 services:
-  template_mcp:
+  mermaid_mcp:
     build: .
-    container_name: template_mcp
+    container_name: mermaid_mcp
     ports:
-      - "${MCP_PORT:-8100}:8000"
+      - "${MCP_PORT:-8400}:8400"
     environment:
-      - MCP_PORT=8000
+      - MCP_PORT=8400
       - AUTH_ENABLED=${AUTH_ENABLED:-false}
       - AUTH_TOKEN=${AUTH_TOKEN:-}
+      - MERMAID_MAX_RETRIES=${MERMAID_MAX_RETRIES:-5}
+      - MERMAID_OUTPUT_DIR=/app/data/diagrams
     volumes:
-      - ./server:/app:ro
+      - mermaid-diagrams:/app/data/diagrams
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:8400/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     restart: unless-stopped
+
+volumes:
+  mermaid-diagrams:
+    driver: local
+

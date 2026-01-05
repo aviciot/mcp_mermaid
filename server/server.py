@@ -16,6 +16,7 @@ from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.staticfiles import StaticFiles
 import uvicorn
 
 from config import get_config
@@ -121,15 +122,52 @@ app = Starlette(lifespan=mcp_http_app.lifespan)
 # ========================================
 # AUTHENTICATION MIDDLEWARE
 # ========================================
+
+# Paths that require token in URL (for browser image loading)
+STATIC_FILE_PATHS = ["/diagrams", "/graphs", "/exports"]
+
 class AuthenticationMiddleware(BaseHTTPMiddleware):
-    """Authentication middleware - validates Bearer token"""
+    """Authentication middleware - validates Bearer token or URL token"""
+    
+    def _is_static_file_path(self, path: str) -> bool:
+        """Check if path is a static file that should use URL token"""
+        return any(path.startswith(p + "/") for p in STATIC_FILE_PATHS)
     
     async def dispatch(self, request, call_next):
-        # Skip auth for health check and info endpoints
+        # Skip auth for health check endpoints
         if request.url.path in ["/healthz", "/health", "/version", "/_info"]:
             return await call_next(request)
         
         # Check if authentication is enabled
+        if not config.is_authentication_enabled():
+            logger.debug("Authentication disabled - allowing request")
+            return await call_next(request)
+        
+        expected_token = config.get_auth_token()
+        
+        # For static files (images), accept token in URL parameter
+        if self._is_static_file_path(request.url.path):
+            url_token = request.query_params.get("token")
+            
+            if not url_token:
+                logger.warning(f"Missing token parameter for static file: {request.url.path}")
+                return JSONResponse(
+                    {"error": "Missing token parameter. Use: ?token=YOUR_TOKEN"},
+                    status_code=403
+                )
+            
+            if url_token != expected_token:
+                logger.warning(f"Invalid token for static file: {request.url.path}")
+                return JSONResponse(
+                    {"error": "Invalid token parameter"},
+                    status_code=403
+                )
+            
+            # Token valid - allow access
+            logger.debug(f"Static file access granted: {request.url.path}")
+            return await call_next(request)
+        
+        # For all other requests (MCP tools), require Bearer token in header
         if not config.is_authentication_enabled():
             logger.debug("Authentication disabled - allowing request")
             return await call_next(request)
@@ -242,9 +280,19 @@ app.add_route("/health/deep", deep_health_check, methods=["GET"])
 app.add_route("/version", version_info, methods=["GET"])
 
 # ========================================
+# SERVE GENERATED DIAGRAMS (for MCPJam Inspector)
+# ========================================
+DIAGRAMS_DIR = os.getenv("MERMAID_OUTPUT_DIR", "/app/data/diagrams")
+if os.path.exists(DIAGRAMS_DIR):
+    app.mount("/diagrams", StaticFiles(directory=DIAGRAMS_DIR), name="diagrams")
+    logger.info(f"🖼️ Serving diagrams at /diagrams from {DIAGRAMS_DIR}")
+else:
+    logger.warning(f"⚠️ Diagrams directory not found: {DIAGRAMS_DIR}")
+
+# ========================================
 # MOUNT FASTMCP HTTP APP
 # ========================================
-# Mount FastMCP at root
+# Mount FastMCP at root (MUST be last)
 app.mount("/", mcp_http_app)
 
 logger.info("✅ FastMCP mounted at /")
